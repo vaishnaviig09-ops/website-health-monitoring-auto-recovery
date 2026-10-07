@@ -1,0 +1,12 @@
+{
+  "name": "website-health-monitoring-auto-recovery",
+  "version": "1.0.0",
+  "description": "Health monitoring and Docker auto-recovery demo",
+  "scripts": {
+    "start:app": "node backend/server.js",
+    "start:monitor": "node monitor/index.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": { "better-sqlite3": "^11.3.0", "express": "^4.19.2" }
+}

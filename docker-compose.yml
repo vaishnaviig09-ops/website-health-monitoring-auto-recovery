@@ -1,0 +1,30 @@
+services:
+  webapp:
+    build: { context: ., dockerfile: docker/Dockerfile.app }
+    container_name: webapp            # the monitor restarts this exact name
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      APP_PORT: 3000
+      MONITOR_URL: http://monitor:4000
+    ports: ["3000:3000"]
+
+  monitor:
+    build: { context: ., dockerfile: docker/Dockerfile.monitor }
+    container_name: monitor
+    restart: unless-stopped
+    depends_on: [webapp]
+    environment:
+      TARGET_URL: http://webapp:3000/health      # service name resolves on the Docker network
+      CHECK_INTERVAL_MS: ${CHECK_INTERVAL_MS:-10000}
+      FAILURE_THRESHOLD: ${FAILURE_THRESHOLD:-3}
+      CONTAINER_NAME: webapp
+      DB_PATH: /data/monitor.db
+      MONITOR_PORT: 4000
+    ports: ["4000:4000"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock   # lets the monitor restart webapp (see README security note)
+      - monitor-data:/data
+
+volumes:
+  monitor-data:
