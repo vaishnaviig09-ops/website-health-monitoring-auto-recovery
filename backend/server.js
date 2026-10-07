@@ -1,14 +1,18 @@
-// Module 1: Web Application. The app we own and monitor.
+// Web Application + Health API
+
 const express = require('express');
 const path = require('path');
 
 function createApp() {
-  // In-memory flag used for SAFE failure simulation.
-  // A container restart resets it to healthy, which is exactly what recovery does.
-  const state = { healthy: true, startedAt: Date.now() };
-  const app = express();
-  const MONITOR_URL = process.env.MONITOR_URL || 'http://localhost:4000';
+  // Healthy by default.
+  const state = {
+    healthy: true,
+    startedAt: Date.now()
+  };
 
+  const app = express();
+
+  // Health endpoint used by the monitoring service.
   app.get('/health', (req, res) => {
     res.status(state.healthy ? 200 : 503).json({
       status: state.healthy ? 'healthy' : 'unhealthy',
@@ -17,38 +21,71 @@ function createApp() {
     });
   });
 
-  app.get('/api/status', (req, res) => res.json({
-    status: state.healthy ? 'RUNNING' : 'FAILING',
-    server: 'Node.js', container: 'Docker',
-    environment: process.env.NODE_ENV || 'development',
-    uptimeSeconds: Math.round((Date.now() - state.startedAt) / 1000)
-  }));
-
-  app.get('/api/metrics', (req, res) => res.json({
-    memoryMB: Math.round(process.memoryUsage().rss / 1048576),
-    uptimeSeconds: Math.round(process.uptime()),
-    pid: process.pid
-  }));
-
-  // Incidents are owned by the monitor, so we ask it.
-  app.get('/api/incidents', async (req, res) => {
-    try {
-      const r = await fetch(`${MONITOR_URL}/api/dashboard`, { signal: AbortSignal.timeout(3000) });
-      res.json((await r.json()).incidents);
-    } catch { res.status(502).json({ error: 'Monitor service unreachable' }); }
+  // Basic application status.
+  app.get('/api/status', (req, res) => {
+    res.json({
+      status: state.healthy ? 'RUNNING' : 'FAILING',
+      server: 'Node.js',
+      container: 'Render',
+      environment: process.env.NODE_ENV || 'development',
+      uptimeSeconds: Math.round(
+        (Date.now() - state.startedAt) / 1000
+      )
+    });
   });
 
+  // Application metrics.
+  app.get('/api/metrics', (req, res) => {
+    res.json({
+      memoryMB: Math.round(
+        process.memoryUsage().rss / 1048576
+      ),
+      uptimeSeconds: Math.round(process.uptime()),
+      pid: process.pid
+    });
+  });
+
+  // Simulate an application failure.
   app.post('/api/simulate-failure', (req, res) => {
     state.healthy = false;
-    res.json({ message: 'Failure simulated: /health now returns 503' });
+
+    res.json({
+      message: 'Failure simulated: /health now returns 503'
+    });
   });
 
-  app.use(express.static(path.join(__dirname, 'public')));
+  // Application recovery.
+  // The monitoring service calls this after detecting
+  // consecutive health-check failures.
+  app.post('/api/recover', (req, res) => {
+    state.healthy = true;
+
+    res.json({
+      message: 'Application recovered successfully'
+    });
+  });
+
+  // Serve backend public files if this server is used directly.
+  app.use(
+    express.static(path.join(__dirname, 'public'))
+  );
+
   return app;
 }
 
-module.exports = { createApp };
+module.exports = {
+  createApp
+};
+
+// Run backend directly.
 if (require.main === module) {
-  const port = process.env.PORT || process.env.APP_PORT || 3000;
-  createApp().listen(port, () => console.log(`[INFO] Web app listening on ${port}`));
+  const port = Number(
+    process.env.PORT ||
+    process.env.APP_PORT ||
+    3000
+  );
+
+  createApp().listen(port, () => {
+    console.log(`[INFO] Web app listening on ${port}`);
+  });
 }
