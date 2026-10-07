@@ -1,48 +1,791 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Health Monitoring Dashboard</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head>
-<body class="bg-light"><div class="container py-4">
-<h2 class="text-center mb-3">Website Health Monitoring System</h2>
-<div id="alert" class="alert d-none"></div>
-<div class="card text-center mb-3 shadow-sm"><div class="card-body">
-  <div class="text-muted">Application Status</div>
-  <h1 id="status" class="display-5">...</h1>
-  <button id="sim" class="btn btn-danger">SIMULATE FAILURE</button>
-</div></div>
-<div class="row g-3 mb-3" id="cards"></div>
-<h5>Recent Health Checks</h5>
-<div class="table-responsive mb-4"><table class="table table-sm table-striped bg-white"><thead><tr>
-<th>Time</th><th>Status</th><th>HTTP</th><th>Response</th><th>Error</th></tr></thead><tbody id="checks"></tbody></table></div>
-<h5>Incident History</h5>
-<div class="table-responsive"><table class="table table-sm table-striped bg-white"><thead><tr>
-<th>ID</th><th>Start</th><th>End</th><th>Reason</th><th>Downtime</th><th>Action</th><th>Recovery</th></tr></thead><tbody id="inc"></tbody></table></div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Website Health Monitoring System</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 30px;
+      background: #f4f6f8;
+      color: #222;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+    }
+
+    .panel {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    .url-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    input {
+      flex: 1;
+      min-width: 300px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 15px;
+    }
+
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    #startBtn {
+      background: #198754;
+      color: white;
+    }
+
+    #stopBtn {
+      background: #dc3545;
+      color: white;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .target {
+      margin-top: 15px;
+      font-size: 16px;
+    }
+
+    .status {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(
+        auto-fit,
+        minmax(180px, 1fr)
+      );
+      gap: 15px;
+    }
+
+    .metric {
+      background: #f8f9fa;
+      padding: 18px;
+      border-radius: 6px;
+    }
+
+    .metric-title {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background: #f1f1f1;
+    }
+
+    .message {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h1>Website Health Monitoring System</h1>
+
+
+  <!-- Website Monitoring -->
+
+  <div class="panel">
+
+    <h3>Website Monitoring</h3>
+
+    <label for="targetUrl">
+      Website URL
+    </label>
+
+    <div class="url-row">
+
+      <input
+        id="targetUrl"
+        type="text"
+        placeholder="https://example.com/health"
+      >
+
+      <button id="startBtn">
+        Start Monitoring
+      </button>
+
+      <button
+        id="stopBtn"
+        disabled
+      >
+        Stop Monitoring
+      </button>
+
+    </div>
+
+    <div class="target">
+      <strong>Current Target:</strong>
+      <span id="currentTarget">None</span>
+    </div>
+
+    <div class="target">
+      <strong>Monitor Status:</strong>
+      <span
+        id="monitorStatus"
+        class="status"
+      >
+        STOPPED
+      </span>
+    </div>
+
+    <div
+      id="message"
+      class="message"
+    ></div>
+
+  </div>
+
+
+  <!-- Selected Website Status -->
+
+  <div class="panel">
+
+    <h3>Selected Website Status</h3>
+
+    <div
+      id="websiteStatus"
+      class="status"
+    >
+      STOPPED
+    </div>
+
+  </div>
+
+
+  <!-- Metrics -->
+
+  <div class="panel">
+
+    <div class="metrics">
+
+      <div class="metric">
+        <div class="metric-title">
+          Response Time
+        </div>
+
+        <div
+          id="responseTime"
+          class="metric-value"
+        >
+          -
+        </div>
+      </div>
+
+
+      <div class="metric">
+        <div class="metric-title">
+          Avg Response
+        </div>
+
+        <div
+          id="avgResponse"
+          class="metric-value"
+        >
+          -
+        </div>
+      </div>
+
+
+      <div class="metric">
+        <div class="metric-title">
+          Uptime
+        </div>
+
+        <div
+          id="uptime"
+          class="metric-value"
+        >
+          100%
+        </div>
+      </div>
+
+
+      <div class="metric">
+        <div class="metric-title">
+          Checks Performed
+        </div>
+
+        <div
+          id="totalChecks"
+          class="metric-value"
+        >
+          0
+        </div>
+      </div>
+
+
+      <div class="metric">
+        <div class="metric-title">
+          Failed Checks
+        </div>
+
+        <div
+          id="failedChecks"
+          class="metric-value"
+        >
+          0
+        </div>
+      </div>
+
+
+      <div class="metric">
+        <div class="metric-title">
+          Automatic Recoveries
+        </div>
+
+        <div
+          id="recoveries"
+          class="metric-value"
+        >
+          0
+        </div>
+      </div>
+
+
+      <div class="metric">
+        <div class="metric-title">
+          Consecutive Failures
+        </div>
+
+        <div
+          id="consecutiveFailures"
+          class="metric-value"
+        >
+          0
+        </div>
+      </div>
+
+
+      <div class="metric">
+        <div class="metric-title">
+          Incidents
+        </div>
+
+        <div
+          id="incidents"
+          class="metric-value"
+        >
+          0
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- Recent Health Checks -->
+
+  <div class="panel">
+
+    <h3>Recent Health Checks</h3>
+
+    <table>
+
+      <thead>
+
+        <tr>
+          <th>Time</th>
+          <th>Status</th>
+          <th>HTTP</th>
+          <th>Response</th>
+          <th>Error</th>
+        </tr>
+
+      </thead>
+
+      <tbody id="checksBody">
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+
+  <!-- Incident History -->
+
+  <div class="panel">
+
+    <h3>Incident History</h3>
+
+    <table>
+
+      <thead>
+
+        <tr>
+          <th>ID</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>Reason</th>
+          <th>Downtime</th>
+          <th>Action</th>
+          <th>Recovery</th>
+        </tr>
+
+      </thead>
+
+      <tbody id="incidentsBody">
+
+      </tbody>
+
+    </table>
+
+  </div>
+
 </div>
+
+
 <script>
-const t = s => s ? new Date(s).toLocaleTimeString() : '-';
-const box = (label, v) => `<div class="col-6 col-md-3"><div class="card text-center shadow-sm"><div class="card-body">
-  <div class="text-muted small">${label}</div><div class="fs-4 fw-bold">${v}</div></div></div></div>`;
-async function refresh() {
-  let d;
-  try { d = await (await fetch('/api/dashboard')).json(); } catch { return; }
-  const m = d.metrics, ok = m.status === 'healthy';
-  status.textContent = m.status === 'unknown' ? 'WAITING...' : (ok ? '🟢 HEALTHY' : '🔴 UNHEALTHY');
-  status.className = 'display-5 ' + (ok ? 'text-success' : 'text-danger');
-  const a = { failure: ['alert-danger', '⚠ APPLICATION FAILURE DETECTED. Automatic recovery initiated.'],
-    recovered: ['alert-success', '✓ APPLICATION RECOVERED. Recovery completed successfully.'],
-    failed: ['alert-warning', '✖ RECOVERY FAILED. Incident remains active.'] }[m.alert];
-  alert.className = 'alert ' + (a ? a[0] : 'd-none'); alert.textContent = a ? a[1] : '';
-  cards.innerHTML = box('Response Time', m.lastResponseTime == null ? '-' : m.lastResponseTime + ' ms')
-    + box('Avg Response', m.avgResponseTime == null ? '-' : m.avgResponseTime + ' ms')
-    + box('Uptime', m.uptime + '%') + box('Total Checks', m.totalChecks)
-    + box('Failed Checks', m.failedChecks) + box('Automatic Recoveries', m.recoveries)
-    + box('Consecutive Failures', m.consecutiveFailures) + box('Incidents', m.incidents);
-  checks.innerHTML = d.checks.map(c => `<tr><td>${t(c.timestamp)}</td>
-    <td class="${c.status === 'healthy' ? 'text-success' : 'text-danger'}">${c.status.toUpperCase()}</td>
-    <td>${c.status_code ?? '-'}</td><td>${c.response_time == null ? '-' : c.response_time + ' ms'}</td><td>${c.error ?? '-'}</td></tr>`).join('');
-  inc.innerHTML = d.incidents.map(i => `<tr><td>${i.incident_id}</td><td>${t(i.start_time)}</td><td>${t(i.end_time)}</td>
-    <td>${i.reason}</td><td>${i.downtime == null ? 'ongoing' : i.downtime + ' sec'}</td><td>${i.recovery_action}</td><td>${i.recovery_status}</td></tr>`).join('')
-    || '<tr><td colspan="7" class="text-center text-muted">No incidents</td></tr>';
-}
-sim.onclick = async () => { await fetch('/api/simulate-failure', { method: 'POST' }); refresh(); };
-refresh(); setInterval(refresh, 3000);
-</script></body></html>
+
+  const targetUrl =
+    document.getElementById('targetUrl');
+
+  const startBtn =
+    document.getElementById('startBtn');
+
+  const stopBtn =
+    document.getElementById('stopBtn');
+
+  const currentTarget =
+    document.getElementById('currentTarget');
+
+  const monitorStatus =
+    document.getElementById('monitorStatus');
+
+  const websiteStatus =
+    document.getElementById('websiteStatus');
+
+  const responseTime =
+    document.getElementById('responseTime');
+
+  const avgResponse =
+    document.getElementById('avgResponse');
+
+  const uptime =
+    document.getElementById('uptime');
+
+  const totalChecks =
+    document.getElementById('totalChecks');
+
+  const failedChecks =
+    document.getElementById('failedChecks');
+
+  const recoveries =
+    document.getElementById('recoveries');
+
+  const consecutiveFailures =
+    document.getElementById(
+      'consecutiveFailures'
+    );
+
+  const incidents =
+    document.getElementById('incidents');
+
+  const checksBody =
+    document.getElementById('checksBody');
+
+  const incidentsBody =
+    document.getElementById(
+      'incidentsBody'
+    );
+
+  const message =
+    document.getElementById('message');
+
+
+  // --------------------------------------------------
+  // Refresh dashboard
+  // --------------------------------------------------
+
+  async function refresh() {
+
+    try {
+
+      const response =
+        await fetch('/api/dashboard');
+
+      const data =
+        await response.json();
+
+      const metrics =
+        data.metrics || {};
+
+      const running =
+        data.monitoring === true;
+
+
+      currentTarget.textContent =
+        data.target || 'None';
+
+
+      monitorStatus.textContent =
+        running
+          ? 'RUNNING'
+          : 'STOPPED';
+
+
+      websiteStatus.textContent =
+        metrics.status || 'STOPPED';
+
+
+      startBtn.disabled =
+        running;
+
+
+      stopBtn.disabled =
+        !running;
+
+
+      responseTime.textContent =
+        metrics.lastResponseTime != null
+          ? `${metrics.lastResponseTime} ms`
+          : '-';
+
+
+      avgResponse.textContent =
+        metrics.avgResponseTime != null
+          ? `${metrics.avgResponseTime} ms`
+          : '-';
+
+
+      uptime.textContent =
+        metrics.uptime != null
+          ? `${metrics.uptime}%`
+          : '100%';
+
+
+      totalChecks.textContent =
+        metrics.totalChecks ?? 0;
+
+
+      failedChecks.textContent =
+        metrics.failedChecks ?? 0;
+
+
+      recoveries.textContent =
+        metrics.recoveries ?? 0;
+
+
+      consecutiveFailures.textContent =
+        metrics.consecutiveFailures ?? 0;
+
+
+      incidents.textContent =
+        metrics.incidents ?? 0;
+
+
+      // ----------------------------------------------
+      // Recent checks
+      // ----------------------------------------------
+
+      checksBody.innerHTML = '';
+
+      const checks =
+        data.checks || [];
+
+
+      if (checks.length === 0) {
+
+        checksBody.innerHTML =
+          '<tr><td colspan="5">No health checks yet</td></tr>';
+
+      } else {
+
+        checks.forEach(check => {
+
+          const row =
+            document.createElement('tr');
+
+          row.innerHTML = `
+            <td>${check.time || check.timestamp || '-'}</td>
+            <td>${check.status || '-'}</td>
+            <td>${check.httpStatus ?? check.http ?? '-'}</td>
+            <td>${
+              check.responseTime != null
+                ? check.responseTime + ' ms'
+                : '-'
+            }</td>
+            <td>${check.error || '-'}</td>
+          `;
+
+          checksBody.appendChild(row);
+
+        });
+
+      }
+
+
+      // ----------------------------------------------
+      // Incidents
+      // ----------------------------------------------
+
+      incidentsBody.innerHTML = '';
+
+      const incidentList =
+        data.incidents || [];
+
+
+      if (incidentList.length === 0) {
+
+        incidentsBody.innerHTML =
+          '<tr><td colspan="7">No incidents</td></tr>';
+
+      } else {
+
+        incidentList.forEach(incident => {
+
+          const row =
+            document.createElement('tr');
+
+          row.innerHTML = `
+            <td>${incident.id ?? '-'}</td>
+            <td>${incident.start || incident.startedAt || '-'}</td>
+            <td>${incident.end || incident.endedAt || '-'}</td>
+            <td>${incident.reason || '-'}</td>
+            <td>${incident.downtime || '-'}</td>
+            <td>${incident.action || '-'}</td>
+            <td>${incident.recovery || '-'}</td>
+          `;
+
+          incidentsBody.appendChild(row);
+
+        });
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        'Dashboard refresh failed:',
+        error
+      );
+
+    }
+
+  }
+
+
+  // --------------------------------------------------
+  // Start monitoring
+  // --------------------------------------------------
+
+  startBtn.addEventListener(
+    'click',
+    async () => {
+
+      const url =
+        targetUrl.value.trim();
+
+
+      if (!url) {
+
+        message.textContent =
+          'Please enter a website URL.';
+
+        return;
+
+      }
+
+
+      message.textContent =
+        'Starting monitoring...';
+
+
+      try {
+
+        const response =
+          await fetch(
+            '/api/monitor/start',
+            {
+              method: 'POST',
+
+              headers: {
+                'Content-Type':
+                  'application/json'
+              },
+
+              body: JSON.stringify({
+                url: url
+              })
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        if (!response.ok) {
+
+          message.textContent =
+            data.message ||
+            'Unable to start monitoring.';
+
+          return;
+
+        }
+
+
+        message.textContent =
+          data.message ||
+          'Monitoring started.';
+
+
+        await refresh();
+
+      } catch (error) {
+
+        message.textContent =
+          'Unable to connect to monitoring server.';
+
+        console.error(error);
+
+      }
+
+    }
+  );
+
+
+  // --------------------------------------------------
+  // Stop monitoring
+  // --------------------------------------------------
+
+  stopBtn.addEventListener(
+    'click',
+    async () => {
+
+      message.textContent =
+        'Stopping monitoring...';
+
+
+      try {
+
+        const response =
+          await fetch(
+            '/api/monitor/stop',
+            {
+              method: 'POST'
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        if (!response.ok) {
+
+          message.textContent =
+            data.message ||
+            'Unable to stop monitoring.';
+
+          return;
+
+        }
+
+
+        message.textContent =
+          data.message ||
+          'Monitoring stopped.';
+
+
+        await refresh();
+
+      } catch (error) {
+
+        message.textContent =
+          'Unable to connect to monitoring server.';
+
+        console.error(error);
+
+      }
+
+    }
+  );
+
+
+  // --------------------------------------------------
+  // Initial dashboard load
+  // --------------------------------------------------
+
+  refresh();
+
+
+  // Refresh every 3 seconds
+
+  setInterval(
+    refresh,
+    3000
+  );
+
+</script>
+
+</body>
+</html>
