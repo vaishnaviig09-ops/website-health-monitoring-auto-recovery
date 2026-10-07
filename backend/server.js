@@ -49,6 +49,6 @@ function createApp() {
 
 module.exports = { createApp };
 if (require.main === module) {
-  const port = process.env.APP_PORT || 3000;
+  const port = process.env.PORT || process.env.APP_PORT || 3000;
   createApp().listen(port, () => console.log(`[INFO] Web app listening on ${port}`));
 }
